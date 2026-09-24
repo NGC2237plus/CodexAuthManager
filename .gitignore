@@ -1,0 +1,53 @@
+# Local credentials and account state (at any depth)
+auth.json
+auth.json.*
+.auth-*.tmp
+.current_account.txt
+my_auth/
+account-manager-recovery/
+.codex/
+settings.json
+.env
+.env.*
+!.env.example
+
+# Local source backups and recovery copies
+backups/
+*.bak
+*.backup
+*.orig
+*.rej
+
+# Generated launchers and build output; keep *.exe.config in source control
+*.exe
+*.dll
+*.pdb
+*.lnk
+bin/
+obj/
+dist/
+publish/
+
+# Test artifacts, logs and temporary files
+TestResults/
+test-results/
+reports/
+coverage/
+codex-accounts-test-*/
+codex-switch-test-*/
+codex-ui-test-*/
+codex-wpf-smoke-*.json
+*.log
+*.tmp
+*.temp
+
+# Editor and operating-system files
+.vs/
+.idea/
+*.user
+*.suo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

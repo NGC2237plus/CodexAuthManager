@@ -1,0 +1,144 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Codex 账户管理" Width="1180" Height="820" MinWidth="980" MinHeight="620"
+        WindowStartupLocation="CenterScreen" Background="#F4F6F9" FontFamily="Microsoft YaHei UI" FontSize="13"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Cursor" Value="Hand"/><Setter Property="Padding" Value="18,11"/>
+      <Setter Property="Foreground" Value="#334155"/><Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#DCE3EC"/><Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Border" Property="Opacity" Value="0.82"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Border" Property="Opacity" Value="0.45"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Border" Property="BorderBrush" Value="#55BAA0"/><Setter TargetName="Border" Property="BorderThickness" Value="2"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="SmallLabel" TargetType="TextBlock"><Setter Property="Foreground" Value="#7A879A"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style TargetType="ProgressBar">
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar">
+        <Grid x:Name="PART_Track" ClipToBounds="True">
+          <Border Background="{TemplateBinding Background}" CornerRadius="3"/>
+          <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left"/>
+        </Grid>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <DataTemplate x:Key="QuotaTemplate">
+      <StackPanel Margin="0,2,0,10">
+        <DockPanel Margin="0,0,0,7">
+          <TextBlock Text="{Binding Percent}" DockPanel.Dock="Right" HorizontalAlignment="Right" Foreground="{Binding Color}" FontWeight="SemiBold"/>
+          <TextBlock Text="{Binding Label}" Foreground="#334155"/>
+        </DockPanel>
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Remaining, Mode=OneWay}" Height="7" BorderThickness="0" Background="#E9EEF3" Foreground="{Binding Color}"/>
+        <TextBlock Text="{Binding Reset}" Style="{StaticResource SmallLabel}" Margin="0,6,0,0"/>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="AccountTemplate">
+      <Border Background="{Binding CardColor}" BorderBrush="{Binding BorderColor}" BorderThickness="1" CornerRadius="11" Padding="17,15" Margin="0,0,12,12">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Margin="0,0,0,8">
+            <Border DockPanel.Dock="Right" Background="#F0F3F7" CornerRadius="5" Padding="7,4" Margin="8,0,0,0">
+              <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="11"/>
+            </Border>
+            <TextBlock Text="{Binding LocalName}" FontSize="16" FontWeight="SemiBold" Foreground="#16283D" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding LocalName}"/>
+          </DockPanel>
+          <StackPanel Grid.Row="1" Margin="0,0,0,14">
+            <TextBlock Text="{Binding Email}" Foreground="#65758A" TextTrimming="CharacterEllipsis" ToolTip="{Binding Email}"/>
+            <DockPanel Margin="0,6,0,0">
+              <TextBlock Text="{Binding Plan}" DockPanel.Dock="Right" Foreground="#16866B" FontSize="11"/>
+              <TextBlock Text="{Binding Kind}" Style="{StaticResource SmallLabel}"/>
+            </DockPanel>
+          </StackPanel>
+          <StackPanel Grid.Row="2" MinHeight="126">
+            <ItemsControl ItemsSource="{Binding Quotas}" ItemTemplate="{StaticResource QuotaTemplate}"/>
+            <TextBlock Text="—" FontSize="22" Foreground="#B5BFCC" Visibility="{Binding EmptyVisibility}"/>
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="#8A6C43" Margin="0,4,0,4" Visibility="{Binding DetailVisibility}"/>
+          </StackPanel>
+          <Button x:Name="SwitchButton" Grid.Row="3" Content="切换到此账户" Padding="10,8" Margin="0,5,0,0" Foreground="#16866B" BorderBrush="#B8DCCE"
+                  IsEnabled="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Visibility="{Binding SwitchVisibility}"/>
+          <TextBlock Grid.Row="3" Text="正在使用的认证文件" Foreground="#16866B" HorizontalAlignment="Center" Margin="0,14,0,9" Visibility="{Binding CurrentVisibility}"/>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </Window.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border Grid.Column="0" Background="#15283B">
+      <Grid Margin="23,30,23,25">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel>
+          <Border Background="#23463F" Width="44" Height="44" CornerRadius="12" HorizontalAlignment="Left"><TextBlock Text="C" Foreground="#8DE0C3" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+          <TextBlock Text="Codex" Foreground="White" FontSize="25" FontWeight="SemiBold" Margin="0,18,0,3"/>
+          <TextBlock Text="本地账户管理" Foreground="#91A6BC" FontSize="12"/>
+        </StackPanel>
+        <Border Grid.Row="1" Background="#263F50" CornerRadius="8" Padding="14,13" Margin="-5,36,-5,0"><TextBlock Text="账户与额度" Foreground="#AEEDD7" FontWeight="SemiBold"/></Border>
+        <StackPanel Grid.Row="3">
+          <TextBlock Text="管理方式" Foreground="#7892AC" FontSize="11" Margin="0,0,0,10"/>
+          <Button x:Name="LegacyButton" Content="打开原版管理器 ↗" Background="#21394E" BorderBrush="#354D63" Foreground="#DFE7EF" Padding="10,12" ToolTip="使用原 BAT 保存或切换账户"/>
+          <TextBlock Text="卡片内切换 · 先备份后替换" Foreground="#91A6BC" FontSize="11" Margin="0,12,0,0" TextWrapping="Wrap"/>
+          <TextBlock Text="WPF  /  v1.2" Foreground="#658099" FontSize="10" Margin="0,26,0,0"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Grid Grid.Column="1" Margin="24,22,24,18">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <DockPanel Grid.Row="0" Margin="0,0,0,23">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="LoginButton" Content="登录新账号" Background="#16866B" BorderBrush="#16866B" Foreground="White" Padding="14,11"/>
+          <Button x:Name="SaveButton" Content="保存当前账号" Margin="8,0,8,0" Padding="14,11"/>
+          <Button x:Name="RefreshButton" Content="刷新全部" Padding="14,11"/>
+        </StackPanel>
+        <StackPanel><TextBlock Text="账户与额度" FontSize="28" FontWeight="SemiBold" Foreground="#16283D"/><TextBlock Text="比较剩余额度，选择要使用的账户。" Foreground="#7A879A" Margin="0,7,0,0"/></StackPanel>
+      </DockPanel>
+      <StackPanel Grid.Row="1" Margin="0,0,0,16">
+        <Border x:Name="CurrentPanel" Background="#EFF8F6" CornerRadius="10" Padding="18,14" BorderBrush="#A7D9CA" BorderThickness="1">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="0.9*"/><ColumnDefinition Width="1.1*"/></Grid.ColumnDefinitions>
+            <StackPanel Margin="0,0,22,0">
+              <DockPanel><TextBlock Text="当前登录" Foreground="#16866B" FontSize="12"/><TextBlock Text="{Binding Plan}" HorizontalAlignment="Right" Foreground="#16866B"/></DockPanel>
+              <TextBlock Text="{Binding LocalName}" FontSize="19" FontWeight="SemiBold" Foreground="#21364D" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding LocalName}"/>
+              <TextBlock x:Name="CurrentEmail" Text="{Binding Email}" Foreground="#65758A" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Email}"/>
+              <TextBlock x:Name="SaveState" Foreground="#16866B" Margin="0,8,0,0" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="11" Margin="0,5,0,0"/>
+            </StackPanel>
+            <ScrollViewer Grid.Column="1" MaxHeight="164" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel><ItemsControl ItemsSource="{Binding Quotas}" ItemTemplate="{StaticResource QuotaTemplate}"/><TextBlock Text="{Binding Message}" Foreground="#8A6C43" TextWrapping="Wrap"/></StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </Border>
+        <Border x:Name="LoginBanner" Visibility="Collapsed" Background="#FFF4DE" CornerRadius="8" Padding="12" Margin="0,10,0,0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+              <Button x:Name="OpenLoginButton" Content="打开 Codex" Padding="10,7" Margin="0,0,8,0"/>
+              <Button x:Name="CancelLoginButton" Content="结束 / 恢复" Padding="10,7"/>
+            </StackPanel>
+            <TextBlock x:Name="LoginStatus" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="#8A6C43"/>
+          </DockPanel>
+        </Border>
+      </StackPanel>
+      <DockPanel Grid.Row="2" Margin="2,0,2,12">
+        <TextBlock x:Name="RefreshTime" Text="尚未刷新" DockPanel.Dock="Right" Foreground="#8794A5" FontSize="11"/>
+        <StackPanel Orientation="Horizontal"><TextBlock Text="其他账号" FontWeight="SemiBold" Foreground="#3A4D62"/><TextBlock Text="  · 已保存 " Foreground="#8794A5"/><TextBlock x:Name="SavedCount" Foreground="#8794A5"/><TextBlock Text="  · 查询异常 " Foreground="#8794A5"/><TextBlock x:Name="ErrorCount" Foreground="#8794A5"/></StackPanel>
+      </DockPanel>
+      <ScrollViewer x:Name="AccountScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0" CanContentScroll="False" Focusable="True">
+        <ItemsControl x:Name="AccountList" ItemTemplate="{StaticResource AccountTemplate}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel IsItemsHost="True"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemContainerStyle><Style TargetType="ContentPresenter">
+            <Setter Property="Width" Value="{Binding Tag, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+          </Style></ItemsControl.ItemContainerStyle>
+        </ItemsControl>
+      </ScrollViewer>
+      <Grid Grid.Row="4" Margin="0,12,0,0">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <ProgressBar x:Name="OverallProgress" Height="3" BorderThickness="0" Background="#E1E7EE" Foreground="#16866B" Maximum="100"/>
+        <DockPanel Grid.Row="1" Margin="0,10,0,0"><TextBlock Text="重置时间为本机时区" DockPanel.Dock="Right" FontSize="11" Foreground="#8A97A8"/><TextBlock x:Name="StatusText" Text="准备就绪" Foreground="#75869A" FontSize="11"/></DockPanel>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>
