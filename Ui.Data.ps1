@@ -23,6 +23,7 @@ function New-AccountRow {
         Kind = $(if ($IsCurrent) { '当前认证文件' } else { '本地保存的账户' })
         Email = '等待联网查询'; Plan = ''; Status = '等待查询'
         VerifiedEmail = ''; SourceFingerprint = ''
+        RefreshText = '刷新'; UpdatedText = '尚未刷新'; QueryFailed = $false
         StatusColor = '#64748B'; Message = ''; Quotas = @()
         EmptyVisibility = 'Visible'; DetailVisibility = 'Collapsed'
         CardColor = $(if ($IsCurrent) { '#EFF8F6' } else { '#FFFFFF' })

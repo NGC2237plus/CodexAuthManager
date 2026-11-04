@@ -54,14 +54,19 @@
               <TextBlock Text="{Binding Plan}" DockPanel.Dock="Right" Foreground="#16866B" FontSize="11"/>
               <TextBlock Text="{Binding Kind}" Style="{StaticResource SmallLabel}"/>
             </DockPanel>
+            <TextBlock Text="{Binding UpdatedText}" Style="{StaticResource SmallLabel}" Margin="0,6,0,0"/>
           </StackPanel>
           <StackPanel Grid.Row="2" MinHeight="126">
             <ItemsControl ItemsSource="{Binding Quotas}" ItemTemplate="{StaticResource QuotaTemplate}"/>
             <TextBlock Text="—" FontSize="22" Foreground="#B5BFCC" Visibility="{Binding EmptyVisibility}"/>
             <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="#8A6C43" Margin="0,4,0,4" Visibility="{Binding DetailVisibility}"/>
           </StackPanel>
-          <Button x:Name="SwitchButton" Grid.Row="3" Content="切换到此账户" Padding="10,8" Margin="0,5,0,0" Foreground="#16866B" BorderBrush="#B8DCCE"
-                  IsEnabled="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Visibility="{Binding SwitchVisibility}"/>
+          <Grid Grid.Row="3" Margin="0,5,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="88"/></Grid.ColumnDefinitions>
+            <Button x:Name="SwitchButton" Content="切换到此账户" Padding="8,8" Margin="0,0,8,0" Foreground="#16866B" BorderBrush="#B8DCCE"
+                    IsEnabled="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Visibility="{Binding SwitchVisibility}"/>
+            <Button x:Name="RefreshAccountButton" Grid.Column="1" Content="{Binding RefreshText}" Padding="8,8" ToolTip="只刷新此账号的状态和额度"/>
+          </Grid>
           <TextBlock Grid.Row="3" Text="正在使用的认证文件" Foreground="#16866B" HorizontalAlignment="Center" Margin="0,14,0,9" Visibility="{Binding CurrentVisibility}"/>
         </Grid>
       </Border>
@@ -105,7 +110,10 @@
               <TextBlock Text="{Binding LocalName}" FontSize="19" FontWeight="SemiBold" Foreground="#21364D" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding LocalName}"/>
               <TextBlock x:Name="CurrentEmail" Text="{Binding Email}" Foreground="#65758A" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Email}"/>
               <TextBlock x:Name="SaveState" Foreground="#16866B" Margin="0,8,0,0" TextWrapping="Wrap"/>
-              <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="11" Margin="0,5,0,0"/>
+              <DockPanel Margin="0,8,0,0">
+                <Button x:Name="RefreshCurrentButton" DockPanel.Dock="Right" Content="{Binding RefreshText}" Padding="12,6" Margin="8,0,0,0" ToolTip="只刷新当前账号的状态和额度"/>
+                <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="11"/><TextBlock Text="{Binding UpdatedText}" Style="{StaticResource SmallLabel}" Margin="0,3,0,0"/></StackPanel>
+              </DockPanel>
             </StackPanel>
             <ScrollViewer Grid.Column="1" MaxHeight="164" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel><ItemsControl ItemsSource="{Binding Quotas}" ItemTemplate="{StaticResource QuotaTemplate}"/><TextBlock Text="{Binding Message}" Foreground="#8A6C43" TextWrapping="Wrap"/></StackPanel>

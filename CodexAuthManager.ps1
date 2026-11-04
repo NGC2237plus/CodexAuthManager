@@ -3,9 +3,11 @@ param(
     [string]$CodexDir = (Join-Path $env:USERPROFILE '.codex'),
     [switch]$Demo,
     [switch]$SmokeTest,
+    [switch]$RefreshSmokeTest,
     [string]$ReportPath = ''
 )
 $ErrorActionPreference = 'Stop'
+if($RefreshSmokeTest -and (-not $Demo -or -not $SmokeTest)){throw 'Refresh smoke tests require -Demo -SmokeTest.'}
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 if ([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA') { throw 'Launch with powershell.exe -STA.' }
 . (Join-Path $PSScriptRoot 'codex-auth-list.ps1') -CodexDir $CodexDir
@@ -16,6 +18,7 @@ $script:AppRoot = $PSScriptRoot
 $script:DataRoot = $CodexDir
 $script:IsDemo = [bool]$Demo
 $script:IsSmoke = [bool]$SmokeTest
+$script:IsRefreshSmoke=[bool]$RefreshSmokeTest
 $script:ReportFile = $ReportPath
 $script:Worker = $null
 $script:Async = $null
@@ -32,7 +35,7 @@ $script:Rows = [System.Collections.ObjectModel.ObservableCollection[object]]::ne
 $reader = [Xml.XmlReader]::Create((Join-Path $PSScriptRoot 'MainWindow.xaml'))
 try { $script:Window = [Windows.Markup.XamlReader]::Load($reader) } finally { $reader.Dispose() }
 $script:Controls = @{}
-foreach ($name in @('RefreshButton','LegacyButton','CurrentEmail','CurrentPanel','SaveState','LoginButton','SaveButton','LoginBanner','LoginStatus','OpenLoginButton','CancelLoginButton','SavedCount','ErrorCount','RefreshTime','AccountList','AccountScroll','OverallProgress','StatusText')) {
+foreach ($name in @('RefreshButton','RefreshCurrentButton','LegacyButton','CurrentEmail','CurrentPanel','SaveState','LoginButton','SaveButton','LoginBanner','LoginStatus','OpenLoginButton','CancelLoginButton','SavedCount','ErrorCount','RefreshTime','AccountList','AccountScroll','OverallProgress','StatusText')) {
     $script:Controls[$name] = $script:Window.FindName($name)
 }
 $script:Controls.AccountList.ItemsSource = $script:Rows
@@ -54,11 +57,12 @@ $script:WorkerCode = {
         $cache = @{}
         for ($i=0; $i -lt $Entries.Count; $i++) {
             $entry = $Entries[$i]
+            $index = $entry.Index
             if ($DemoMode) {
                 Start-Sleep -Milliseconds 180
-                if ($i -eq 3) { $summary = [pscustomobject]@{Ok=$false;Error='HTTP 401'} }
+                if ($index -eq 3) { $summary = [pscustomobject]@{Ok=$false;Error='HTTP 401'} }
                 else {
-                    $used = @(18,42,100,0,8)[$i % 5]
+                    $used = @(18,42,100,0,8)[$index % 5]
                     $usage = [pscustomobject]@{
                         plan_type='plus'; code_review_rate_limit=$null; additional_rate_limits=@()
                         rate_limit=[pscustomobject]@{
@@ -67,7 +71,7 @@ $script:WorkerCode = {
                             secondary_window=[pscustomobject]@{used_percent=($used / 2);limit_window_seconds=604800;reset_at=1790679600}
                         }
                     }
-                    $summary = [pscustomobject]@{Ok=$true;OnlineName=('account{0}@example.com' -f ($i+1));Usage=$usage}
+                    $summary = [pscustomobject]@{Ok=$true;OnlineName=('account{0}@example.com' -f ($index+1));Usage=$usage}
                 }
             } else {
                 $summary = Get-CodexOnlineSummary -AuthPath $entry.AuthPath -Cache $cache -Timeout 12
@@ -76,7 +80,9 @@ $script:WorkerCode = {
             $row.SourceFingerprint=[string]$entry.Identity.Fingerprint
             if($summary.Ok){$row.VerifiedEmail=ConvertTo-CodexDisplayText (Get-CodexField $summary.Usage 'email')}
             if (-not $summary.Ok -and $entry.Identity.Email) { $row.Email=$entry.Identity.Email + '（本地凭据）' }
-            $Queue.Enqueue([pscustomobject]@{Kind='row';Index=$i;Row=$row;Ok=[bool]$summary.Ok})
+            $row.QueryFailed=-not [bool]$summary.Ok
+            $row.UpdatedText=$(if($summary.Ok){'更新于 '}else{'查询于 '}) + (Get-Date -Format 'HH:mm:ss')
+            $Queue.Enqueue([pscustomobject]@{Kind='row';Index=$index;Row=$row;Ok=[bool]$summary.Ok})
         }
     } catch {
         # Do not send exception details or secret-bearing records to the UI.
@@ -84,8 +90,29 @@ $script:WorkerCode = {
     }
 }
 
+function Set-RefreshRow([int]$Index,$Row) {
+    if($Index -eq 0){$script:Controls.CurrentPanel.DataContext=$Row}
+    else{$script:Rows[$Index-1]=$Row}
+}
+function Reset-RefreshControls {
+    foreach($entry in $script:RefreshEntries){
+        $row=if($entry.Index -eq 0){$script:Controls.CurrentPanel.DataContext}else{$script:Rows[$entry.Index-1]}
+        if($row.RefreshText -ne '刷新'){
+            $copy=$row.PSObject.Copy();$copy.RefreshText='刷新';Set-RefreshRow $entry.Index $copy
+        }
+    }
+    $script:Controls.RefreshButton.IsEnabled=$true
+    $script:Controls.RefreshButton.Content='刷新全部'
+    $script:Failures=@(@($script:Controls.CurrentPanel.DataContext)+@($script:Rows) | Where-Object QueryFailed).Count
+    $script:Controls.ErrorCount.Text=[string]$script:Failures
+    Update-ActionButtons
+}
 function Start-AccountRefresh {
+    param([int]$EntryIndex=-1)
     if ($null -ne $script:Worker) { return }
+    if($EntryIndex -ge 0 -and ($EntryIndex -ge $script:Entries.Count -or ($EntryIndex -gt 0 -and $null -ne $script:PendingLogin))){return}
+    $script:SingleRefresh=$EntryIndex -ge 0
+    $script:RefreshEntries=@()
     $script:Generation++
     $script:Finished = $false
     $script:UiFault = $false
@@ -93,13 +120,14 @@ function Start-AccountRefresh {
     $script:Failures = 0
     $script:Controls.RefreshButton.IsEnabled = $false
     $script:Controls.AccountList.IsEnabled = $false
+    $script:Controls.RefreshCurrentButton.IsEnabled = $false
     $script:Controls.LoginButton.IsEnabled = $false
     $script:Controls.SaveButton.IsEnabled = $false
-    $script:Controls.RefreshButton.Content = '正在刷新…'
-    $script:Controls.ErrorCount.Text = '—'
+    if(-not $script:SingleRefresh){$script:Controls.RefreshButton.Content = '正在刷新…';$script:Controls.ErrorCount.Text = '—'}
     $script:Controls.OverallProgress.Value = 0
     $script:Controls.StatusText.Text = '正在查询账户，结果将逐个显示…'
     try {
+      if(-not $script:SingleRefresh){
         if ($script:IsDemo) {
             $script:Entries = @(
                 [pscustomobject]@{Name='当前登录';IsCurrent=$true;AuthPath=''},
@@ -121,18 +149,27 @@ function Start-AccountRefresh {
             $row=New-AccountRow $entry.Name $entry.IsCurrent
             if($entry.IsCurrent){$script:Controls.CurrentPanel.DataContext=$row}else{$script:Rows.Add($row)}
         }
+      }
+        $indices=if($script:SingleRefresh){@($EntryIndex)}else{@(0..($script:Entries.Count-1))}
+        $script:RefreshEntries=@(foreach($index in $indices){
+            $entry=$script:Entries[$index]
+            $identity=if($script:IsDemo){$null}else{Get-AuthIdentity -Path $entry.AuthPath}
+            [pscustomobject]@{Index=$index;Name=$entry.Name;IsCurrent=$entry.IsCurrent;AuthPath=$entry.AuthPath;Identity=$identity}
+        })
+        if($script:SingleRefresh){
+            $row=if($EntryIndex -eq 0){$script:Controls.CurrentPanel.DataContext}else{$script:Rows[$EntryIndex-1]}
+            $copy=$row.PSObject.Copy();$copy.RefreshText='刷新中…';Set-RefreshRow $EntryIndex $copy
+            $script:Controls.StatusText.Text='正在刷新：'+$row.LocalName
+        }
         $script:Queue = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
         $script:Worker = [PowerShell]::Create()
-        [void]$script:Worker.AddScript($script:WorkerCode.ToString()).AddArgument($script:AppRoot).AddArgument($script:Entries).AddArgument($script:Queue).AddArgument($script:IsDemo)
+        [void]$script:Worker.AddScript($script:WorkerCode.ToString()).AddArgument($script:AppRoot).AddArgument($script:RefreshEntries).AddArgument($script:Queue).AddArgument($script:IsDemo)
         $script:Async = $script:Worker.BeginInvoke()
         $script:Timer.Start()
     } catch {
         if ($null -ne $script:Worker) { $script:Worker.Dispose(); $script:Worker=$null }
         $script:UiFault = $true
-        $script:Controls.RefreshButton.IsEnabled = $true
-        $script:Controls.AccountList.IsEnabled = $true
-        Update-ActionButtons
-        $script:Controls.RefreshButton.Content = '重新刷新'
+        Reset-RefreshControls
         $script:Controls.StatusText.Text = '无法读取本地账户目录，请检查文件权限后重试。'
         if ($script:IsSmoke) { Write-SmokeReport; $script:Window.Close() }
     }
@@ -171,6 +208,7 @@ function Write-SmokeReport {
         CurrentInList=@($script:Rows | Where-Object IsCurrent).Count
         CurrentAtTop=[bool]$script:Controls.CurrentPanel.DataContext.IsCurrent
         HeaderActions=@('LoginButton','SaveButton','RefreshButton') | ForEach-Object {$script:Controls[$_].Content}
+        SingleRefreshChecks=$script:RefreshChecks
     }
     $layouts = @()
     foreach ($testWidth in @(980,1180,1500)) {
@@ -205,8 +243,8 @@ $script:Timer.Add_Tick({
                 else{$script:Rows[$item.Index-1] = $item.Row}
                 $script:Completed++
                 if (-not $item.Ok) { $script:Failures++ }
-                $script:Controls.OverallProgress.Value = 100 * $script:Completed / [Math]::Max(1,$script:Entries.Count)
-                $script:Controls.StatusText.Text = '正在更新 {0} / {1} 个条目…' -f $script:Completed,$script:Entries.Count
+                $script:Controls.OverallProgress.Value = 100 * $script:Completed / [Math]::Max(1,$script:RefreshEntries.Count)
+                $script:Controls.StatusText.Text = '正在更新 {0} / {1} 个条目…' -f $script:Completed,$script:RefreshEntries.Count
             } else { $script:UiFault=$true }
             $item=$null
         }
@@ -216,32 +254,41 @@ $script:Timer.Add_Tick({
             $script:Worker.Dispose(); $script:Worker=$null; $script:Async=$null
             $script:Timer.Stop()
             $script:Finished=$true
-            $script:Controls.RefreshButton.IsEnabled=$true
-            $script:Controls.AccountList.IsEnabled=$true
-            Update-ActionButtons
-            $script:Controls.RefreshButton.Content='刷新全部'
-            $script:Controls.ErrorCount.Text=[string]$script:Failures
-            $script:Controls.RefreshTime.Text='更新于 ' + (Get-Date -Format 'HH:mm:ss')
+            Reset-RefreshControls
+            $script:Controls.RefreshTime.Text=$(if($script:SingleRefresh){'单账号更新于 '}else{'全部更新于 '}) + (Get-Date -Format 'HH:mm:ss')
             if ($script:UiFault) { $script:Controls.StatusText.Text='部分查询未能完成，请重新刷新。' }
+            elseif($script:SingleRefresh){$script:Controls.StatusText.Text='单账号刷新完成：'+$script:RefreshEntries[0].Name+' · 共 '+$script:Failures+' 个查询异常'}
             else { $script:Controls.StatusText.Text='更新完成 · {0} 个条目，{1} 个查询异常' -f $script:Completed,$script:Failures }
-            if ($script:IsSmoke) { Write-SmokeReport; $script:Window.Close() }
+            if ($script:IsSmoke) {
+                if($script:IsRefreshSmoke -and -not $script:UiFault){if(Invoke-RefreshSmokeStep){return}}
+                Write-SmokeReport; $script:Window.Close()
+            }
         }
     } catch {
         $script:UiFault=$true
         $script:Timer.Stop()
+        if($null -ne $script:Worker){$script:Worker.Stop();$script:Worker.Dispose();$script:Worker=$null;$script:Async=$null}
+        Reset-RefreshControls
         $script:Controls.StatusText.Text='界面更新失败，请关闭后重新打开。'
         if ($script:IsSmoke) { Write-SmokeReport; $script:Window.Close() }
     }
 })
 . (Join-Path $script:AppRoot 'Ui.Actions.ps1')
+if($script:IsRefreshSmoke){. (Join-Path $script:AppRoot 'tests\Refresh.Scenarios.ps1')}
 $script:Controls.AccountList.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
     param($sender,$eventArgs)
     if ($eventArgs.OriginalSource -is [Windows.Controls.Button] -and $eventArgs.OriginalSource.Name -eq 'SwitchButton') {
         $eventArgs.Handled = $true
         Show-AccountAction -Mode Switch -Row $eventArgs.OriginalSource.DataContext
     }
+    elseif($eventArgs.OriginalSource -is [Windows.Controls.Button] -and $eventArgs.OriginalSource.Name -eq 'RefreshAccountButton'){
+        $eventArgs.Handled=$true
+        $index=$script:Rows.IndexOf($eventArgs.OriginalSource.DataContext)
+        if($index -ge 0){Start-AccountRefresh -EntryIndex ($index+1)}
+    }
 })
 $script:Controls.RefreshButton.Add_Click({ Start-AccountRefresh })
+$script:Controls.RefreshCurrentButton.Add_Click({ Start-AccountRefresh -EntryIndex 0 })
 $script:Controls.AccountScroll.Add_PreviewMouseWheel({
     param($sender,$eventArgs)
     $sender.ScrollToVerticalOffset($sender.VerticalOffset - $eventArgs.Delta)

@@ -8,6 +8,7 @@ function Update-ActionButtons {
     $pending=$null -ne $script:PendingLogin
     $script:Controls.LoginButton.IsEnabled=$idle -and -not $pending
     $script:Controls.AccountList.IsEnabled=$idle -and -not $pending
+    $script:Controls.RefreshCurrentButton.IsEnabled=$idle
     $hasAuth=$script:IsDemo -or ($script:Inventory -and $script:Inventory.Current.Identity.ValidCredential)
     $script:Controls.SaveButton.IsEnabled=$idle -and $hasAuth -and (-not $pending -or $script:LoginReady)
     $script:Controls.LegacyButton.IsEnabled=-not $script:IsDemo -and -not $pending
